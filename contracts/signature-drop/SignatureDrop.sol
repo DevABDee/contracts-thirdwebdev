@@ -90,6 +90,12 @@ contract SignatureDrop is
     error SignatureDrop__NotTransferRole();
 
     /*///////////////////////////////////////////////////////////////
+                            Mappings
+    //////////////////////////////////////////////////////////////*/
+
+    mapping(uint256 => bytes32) private tokenIdOffset;
+
+    /*///////////////////////////////////////////////////////////////
                     Constructor + initializer logic
     //////////////////////////////////////////////////////////////*/
 
@@ -144,13 +150,32 @@ contract SignatureDrop is
 
     /// @dev Returns the URI for a given tokenId.
     function tokenURI(uint256 _tokenId) public view override returns (string memory) {
-        uint256 batchId = getBatchId(_tokenId);
+        // Get batchId and index of batchId in batchIds[];
+        (uint256 batchId, uint256 index) = getBatchId(_tokenId);
+
+        // Get base URI for the batch that `_tokenId` belongs to.
         string memory batchUri = getBaseURI(_tokenId);
 
         if (isEncryptedBatch(batchId)) {
             return string(abi.encodePacked(batchUri, "0"));
         } else {
-            return string(abi.encodePacked(batchUri, _tokenId.toString()));
+
+            uint256 metadataId;
+            bytes32 offset = tokenIdOffset[batchId];
+
+            if(offset.length > 0) {
+                // Get metadata for tokenId post random offset.
+                uint256 randomness = uint256(tokenIdOffset[batchId]);
+                uint256 prevBatchId;
+                if(index > 0) {
+                    prevBatchId = getBatchIdAtIndex(index - 1);
+                }
+                metadataId = (randomness + _tokenId) % (batchId - prevBatchId);
+            } else {
+                metadataId = _tokenId;
+            }
+
+            return string(abi.encodePacked(batchUri, metadataId.toString()));
         }
     }
 
@@ -182,6 +207,7 @@ contract SignatureDrop is
 
         if (_encryptedBaseURI.length != 0) {
             _setEncryptedBaseURI(batchId, _encryptedBaseURI);
+            _scrambleOffset(batchId, _encryptedBaseURI);
         }
 
         emit TokensLazyMinted(startId, startId + _amount - 1, _baseURIForTokens, _encryptedBaseURI);
@@ -338,6 +364,11 @@ contract SignatureDrop is
     /*///////////////////////////////////////////////////////////////
                         Miscellaneous
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Scrambles tokenId offset for a batch Id.
+    function _scrambleOffset(uint256 _batchId, bytes calldata _seed) private {
+        tokenIdOffset[_batchId] = keccak256(abi.encodePacked(_seed, blockhash(block.number - 1)));
+    }
 
     /// @dev Burns `tokenId`. See {ERC721-_burn}.
     function burn(uint256 tokenId) external virtual {
