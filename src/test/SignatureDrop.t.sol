@@ -255,6 +255,71 @@ contract SignatureDropTest is BaseTest {
     }
 
     /**
+     *  @dev Tests contract state for Transfer role.
+     */
+    function test_state_getRoleMember_transferRole() public {
+        bytes32 role = keccak256("TRANSFER_ROLE");
+
+        uint256 roleMemberCount = sigdrop.getRoleMemberCount(role);
+        assertEq(roleMemberCount, 2);
+
+        address roleMember = sigdrop.getRoleMember(role, 1);
+        assertEq(roleMember, address(0));
+
+        vm.startPrank(deployerSigner);
+        sigdrop.grantRole(role, address(2));
+        sigdrop.grantRole(role, address(3));
+        sigdrop.grantRole(role, address(4));
+
+        roleMemberCount = sigdrop.getRoleMemberCount(role);
+        console.log(roleMemberCount);
+        for(uint256 i = 0; i < roleMemberCount; i++) {
+            console.log(sigdrop.getRoleMember(role, i));
+        }
+        console.log("");
+
+        sigdrop.revokeRole(role, address(2));
+        roleMemberCount = sigdrop.getRoleMemberCount(role);
+        console.log(roleMemberCount);
+        for(uint256 i = 0; i < roleMemberCount; i++) {
+            console.log(sigdrop.getRoleMember(role, i));
+        }
+        console.log("");
+
+        sigdrop.revokeRole(role, address(0));
+        roleMemberCount = sigdrop.getRoleMemberCount(role);
+        console.log(roleMemberCount);
+        for(uint256 i = 0; i < roleMemberCount; i++) {
+            console.log(sigdrop.getRoleMember(role, i));
+        }
+        console.log("");
+
+        sigdrop.grantRole(role, address(5));
+        roleMemberCount = sigdrop.getRoleMemberCount(role);
+        console.log(roleMemberCount);
+        for(uint256 i = 0; i < roleMemberCount; i++) {
+            console.log(sigdrop.getRoleMember(role, i));
+        }
+        console.log("");
+
+        sigdrop.grantRole(role, address(0));
+        roleMemberCount = sigdrop.getRoleMemberCount(role);
+        console.log(roleMemberCount);
+        for(uint256 i = 0; i < roleMemberCount; i++) {
+            console.log(sigdrop.getRoleMember(role, i));
+        }
+        console.log("");
+
+        sigdrop.grantRole(role, address(6));
+        roleMemberCount = sigdrop.getRoleMemberCount(role);
+        console.log(roleMemberCount);
+        for(uint256 i = 0; i < roleMemberCount; i++) {
+            console.log(sigdrop.getRoleMember(role, i));
+        }
+        console.log("");
+    }
+
+    /**
      *  note: Testing transfer of tokens when transfer-role is restricted
      */
     function test_claim_transferRole() public {
