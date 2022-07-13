@@ -219,6 +219,74 @@ contract SignatureDropTest is BaseTest {
     }
 
     /**
+     *  @dev Tests contract state for Transfer role.
+     */
+    function test_state_grant_transferRole() public {
+        bytes32 role = keccak256("TRANSFER_ROLE");
+
+        // check if admin and address(0) have transfer role in the beginning
+        bool checkAddressZero = sigdrop.hasRole(role, address(0));
+        bool checkAdmin = sigdrop.hasRole(role, deployerSigner);
+        assertTrue(checkAddressZero);
+        assertTrue(checkAdmin);
+
+        // check if transfer role can be granted to a non-holder
+        address receiver = getActor(0);
+        vm.startPrank(deployerSigner);
+        sigdrop.grantRole(role, receiver);
+
+        // expect revert when granting to a holder
+        vm.expectRevert("Can only grant to non holders");
+        sigdrop.grantRole(role, receiver);
+
+        // check if receiver has transfer role
+        bool checkReceiver = sigdrop.hasRole(role, receiver);
+        assertTrue(checkReceiver);
+
+        // check if role is correctly revoked
+        sigdrop.revokeRole(role, receiver);
+        checkReceiver = sigdrop.hasRole(role, receiver);
+        assertFalse(checkReceiver);
+        sigdrop.revokeRole(role, address(0));
+        checkAddressZero = sigdrop.hasRole(role, address(0));
+        assertFalse(checkAddressZero);
+
+        vm.stopPrank();
+    }
+
+    /**
+     *  note: Testing transfer of tokens when transfer-role is restricted
+     */
+    function test_claim_transferRole() public {
+        vm.warp(1);
+
+        address receiver = getActor(0);
+        bytes32[] memory proofs = new bytes32[](0);
+
+        SignatureDrop.AllowlistProof memory alp;
+        alp.proof = proofs;
+
+        SignatureDrop.ClaimCondition[] memory conditions = new SignatureDrop.ClaimCondition[](1);
+        conditions[0].maxClaimableSupply = 100;
+        conditions[0].quantityLimitPerTransaction = 100;
+
+        vm.prank(deployerSigner);
+        sigdrop.lazyMint(100, "ipfs://", "");
+        vm.prank(deployerSigner);
+        sigdrop.setClaimConditions(conditions[0], false);
+
+        vm.prank(getActor(5), getActor(5));
+        sigdrop.claim(receiver, 1, address(0), 0, alp, "");
+
+        // revoke transfer role from address(0)
+        vm.prank(deployerSigner);
+        sigdrop.revokeRole(keccak256("TRANSFER_ROLE"), address(0));
+        vm.startPrank(receiver);
+        vm.expectRevert("!Transfer-Role");
+        sigdrop.transferFrom(receiver, address(123), 0);
+    }
+
+    /**
      *  @dev Tests whether role member count is incremented correctly.
      */
     function test_member_count_incremented_properly_when_role_granted() public {
