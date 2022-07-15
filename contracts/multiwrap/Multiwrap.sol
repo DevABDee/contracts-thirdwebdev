@@ -20,6 +20,7 @@ import "../extension/Royalty.sol";
 import "../extension/Ownable.sol";
 import "../extension/PermissionsEnumerable.sol";
 import { TokenStore, ERC1155Receiver, IERC1155Receiver } from "../extension/TokenStore.sol";
+import { TokenBundleRestricted } from "../extension/TokenBundleRestricted.sol";
 
 contract Multiwrap is
     Initializable,
@@ -28,6 +29,7 @@ contract Multiwrap is
     Ownable,
     PermissionsEnumerable,
     TokenStore,
+    TokenBundleRestricted,
     ReentrancyGuardUpgradeable,
     ERC2771ContextUpgradeable,
     MulticallUpgradeable,
@@ -155,6 +157,9 @@ contract Multiwrap is
         string calldata _uriForWrappedToken,
         address _recipient
     ) external payable nonReentrant onlyRoleWithSwitch(MINTER_ROLE) returns (uint256 tokenId) {
+        if(!checkTokenRestrictions(_tokensToWrap)) {
+            revert("Required assets not present");
+        }
         if (!hasRole(ASSET_ROLE, address(0))) {
             for (uint256 i = 0; i < _tokensToWrap.length; i += 1) {
                 _checkRole(ASSET_ROLE, _tokensToWrap[i].assetContract);
@@ -212,6 +217,11 @@ contract Multiwrap is
 
     /// @dev Returns whether contract metadata can be set in the given execution context.
     function _canSetContractURI() internal view override returns (bool) {
+        return hasRole(DEFAULT_ADMIN_ROLE, _msgSender());
+    }
+
+    /// @dev Returns whether contract metadata can be set in the given execution context.
+    function _canSetTokenRestrictions() internal view override returns (bool) {
         return hasRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
