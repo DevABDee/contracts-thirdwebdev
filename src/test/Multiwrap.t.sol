@@ -53,6 +53,7 @@ contract MultiwrapTest is BaseTest {
     Wallet internal tokenOwner;
     string internal uriForWrappedToken;
     ITokenBundle.Token[] internal wrappedContent;
+    ITokenBundle.Token[] internal requiredAssets;
 
     function setUp() public override {
         super.setUp();
@@ -89,6 +90,16 @@ contract MultiwrapTest is BaseTest {
             })
         );
 
+        // create list of required assets
+        requiredAssets.push(
+            ITokenBundle.Token({
+                assetContract: address(erc20),
+                tokenType: ITokenBundle.TokenType.ERC20,
+                tokenId: 0,
+                totalAmount: 10 ether
+            })
+        );
+
         // Mint tokens-to-wrap to `tokenOwner`
         erc20.mint(address(tokenOwner), 10 ether);
         erc721.mint(address(tokenOwner), 1);
@@ -107,6 +118,67 @@ contract MultiwrapTest is BaseTest {
     /*///////////////////////////////////////////////////////////////
                         Unit tests: misc.
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     *  note: Testing state changes; token owner calls `wrap` to wrap owned tokens.
+     */
+    function test_state_wrapWithRestrictions() public {
+        vm.prank(deployer);
+        multiwrap.setTokenRestrictions(requiredAssets);
+
+        uint256 expectedIdForWrappedToken = multiwrap.nextTokenIdToMint();
+        address recipient = address(0x123);
+
+        vm.prank(address(tokenOwner));
+        multiwrap.wrap(wrappedContent, uriForWrappedToken, recipient);
+
+        assertEq(expectedIdForWrappedToken + 1, multiwrap.nextTokenIdToMint());
+
+        ITokenBundle.Token[] memory contentsOfWrappedToken = multiwrap.getWrappedContents(expectedIdForWrappedToken);
+        assertEq(contentsOfWrappedToken.length, wrappedContent.length);
+        for (uint256 i = 0; i < contentsOfWrappedToken.length; i += 1) {
+            assertEq(contentsOfWrappedToken[i].assetContract, wrappedContent[i].assetContract);
+            assertEq(uint256(contentsOfWrappedToken[i].tokenType), uint256(wrappedContent[i].tokenType));
+            assertEq(contentsOfWrappedToken[i].tokenId, wrappedContent[i].tokenId);
+            assertEq(contentsOfWrappedToken[i].totalAmount, wrappedContent[i].totalAmount);
+        }
+
+        assertEq(uriForWrappedToken, multiwrap.tokenURI(expectedIdForWrappedToken));
+    }
+
+    function test_revert_state_wrapWithRestrictions() public {
+        // set restrictions
+        requiredAssets[0].totalAmount = 100 ether;
+        vm.prank(deployer);
+        multiwrap.setTokenRestrictions(requiredAssets);
+
+        uint256 expectedIdForWrappedToken = multiwrap.nextTokenIdToMint();
+        address recipient = address(0x123);
+
+        vm.prank(address(tokenOwner));
+        vm.expectRevert("Required assets not present");
+        multiwrap.wrap(wrappedContent, uriForWrappedToken, recipient);
+
+        // clear restrictions
+        vm.prank(deployer);
+        multiwrap.clearRestrictions();
+
+        vm.prank(address(tokenOwner));
+        multiwrap.wrap(wrappedContent, uriForWrappedToken, recipient);
+
+        assertEq(expectedIdForWrappedToken + 1, multiwrap.nextTokenIdToMint());
+
+        ITokenBundle.Token[] memory contentsOfWrappedToken = multiwrap.getWrappedContents(expectedIdForWrappedToken);
+        assertEq(contentsOfWrappedToken.length, wrappedContent.length);
+        for (uint256 i = 0; i < contentsOfWrappedToken.length; i += 1) {
+            assertEq(contentsOfWrappedToken[i].assetContract, wrappedContent[i].assetContract);
+            assertEq(uint256(contentsOfWrappedToken[i].tokenType), uint256(wrappedContent[i].tokenType));
+            assertEq(contentsOfWrappedToken[i].tokenId, wrappedContent[i].tokenId);
+            assertEq(contentsOfWrappedToken[i].totalAmount, wrappedContent[i].totalAmount);
+        }
+
+        assertEq(uriForWrappedToken, multiwrap.tokenURI(expectedIdForWrappedToken));
+    }
 
     /**
      *  note: Tests whether contract revert when a non-holder renounces a role.
