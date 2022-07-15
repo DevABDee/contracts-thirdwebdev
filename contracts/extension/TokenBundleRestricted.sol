@@ -30,7 +30,7 @@ abstract contract TokenBundleRestricted is TokenBundle {
         }
 
         for(uint256 i = 0; i < count; i++) {
-            if(requiredAmounts[i] != restrictedAssetAt[i + 1].totalAmount) {
+            if(requiredAmounts[i] < restrictedAssetAt[i + 1].totalAmount) {
                 return false;
             }
         }
